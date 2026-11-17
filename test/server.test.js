@@ -91,6 +91,16 @@ test('GitHub Pages API CORS is restricted to the configured HTTPS origin', async
   assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true');
   assert.match(preflight.headers.get('access-control-allow-headers'), /X-CSRF-Token/i);
 
+  const registration = await fetch(`${base}/api/v1/auth/register`, {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'pages@example.test', password: 'correct-horse-battery' })
+  });
+  assert.equal(registration.status, 201);
+  assert.equal(registration.headers.get('access-control-allow-origin'), origin);
+  assert.match(registration.headers.get('set-cookie'), /SameSite=None; Max-Age=/);
+  assert.match(registration.headers.get('set-cookie'), /Secure/);
+
   const rejected = await fetch(`${base}/api/v1/auth/login`, {
     method: 'OPTIONS',
     headers: {

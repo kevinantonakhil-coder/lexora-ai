@@ -2119,7 +2119,7 @@ function createServer(options = {}) {
 if (require.main === module) {
   const { server } = createServer();
   const host = process.env.LEXORA_HOST || '127.0.0.1';
-  const port = Number(process.env.LEXORA_PORT || 3000);
+  const port = Number(process.env.PORT || process.env.LEXORA_PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     console.error('LEXORA_PORT must be a valid TCP port.');
     process.exitCode = 1;

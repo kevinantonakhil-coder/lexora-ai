@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: lexora-ai-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    disk:
+      name: lexora-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LEXORA_HOST
+        value: 0.0.0.0
+      - key: LEXORA_DATA_DIR
+        value: /app/data
+      - key: LEXORA_ML_CACHE_DIR
+        value: /app/data/model-cache
+      - key: LEXORA_ALLOW_SIGNUP
+        value: "false"
+      - key: LEXORA_ALLOWED_ORIGIN
+        value: https://kevinantonakhil-coder.github.io
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: LEXORA_ADMIN_BOOTSTRAP_TOKEN
+        sync: false

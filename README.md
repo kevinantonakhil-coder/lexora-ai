@@ -64,7 +64,8 @@ npm run ml:smoke
 ## Deployment guidance
 
 - GitHub Pages deploys the static frontend from `public/` using `.github/workflows/pages.yml`. In the repository settings, choose **Pages → Build and deployment → GitHub Actions**.
-- GitHub Pages does not run the Node.js backend. Host the backend separately on a Node.js-capable service with persistent storage; provision `GEMINI_API_KEY` and `GEMINI_MODEL` only in that backend's secret manager.
+- GitHub Pages does not run the Node.js backend. `render.yaml` prepares a Render Docker web service with a persistent disk for SQLite. Creating that service may require a paid plan; confirm current Render pricing before deploying.
+- To create the backend: sign in to Render, choose **New → Blueprint**, connect `kevinantonakhil-coder/lexora-ai`, select `render.yaml`, and create the service. In the Render service's environment settings, fill in `GEMINI_API_KEY`, `GEMINI_MODEL`, and a long random `LEXORA_ADMIN_BOOTSTRAP_TOKEN`. Do not add any of those secrets to GitHub.
 - After hosting the backend, set `window.LEXORA_API_BASE_URL` in `public/api-config.js` to its HTTPS origin and set backend `LEXORA_ALLOWED_ORIGIN` to the exact Pages origin (for this repository: `https://kevinantonakhil-coder.github.io`). These are public endpoint/origin values, not secrets.
 - Cross-site authentication depends on browser cookie privacy settings. The backend uses `SameSite=None; Secure` only when an explicit allowed origin is configured; some browsers may block third-party cookies. A custom domain/reverse proxy that keeps frontend and API same-site is preferable for a production deployment.
 - Keep `GEMINI_API_KEY` in a real secret manager or server environment.
