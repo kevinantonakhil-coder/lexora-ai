@@ -1,0 +1,18 @@
+{
+  "name": "lexora-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A source-conscious legal information workspace demonstration",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test",
+    "check": "node --check src/server.js && node --check src/ml/semantic.js && node --check public/app.js && node --test",
+    "ml:smoke": "node scripts/ml-smoke.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.2"
+  }
+}

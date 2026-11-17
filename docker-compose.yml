@@ -1,0 +1,22 @@
+services:
+  lexora:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: development
+      LEXORA_HOST: 0.0.0.0
+      LEXORA_PORT: 3000
+      LEXORA_DATA_DIR: /app/data
+      LEXORA_ALLOW_SIGNUP: "false"
+      LEXORA_ADMIN_BOOTSTRAP_TOKEN: ${LEXORA_ADMIN_BOOTSTRAP_TOKEN:?Set a private bootstrap token before starting}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-20000}
+      GEMINI_INPUT_USD_PER_MILLION: ${GEMINI_INPUT_USD_PER_MILLION:-}
+      GEMINI_OUTPUT_USD_PER_MILLION: ${GEMINI_OUTPUT_USD_PER_MILLION:-}
+      LEXORA_ML_CACHE_DIR: ${LEXORA_ML_CACHE_DIR:-/app/data/model-cache}
+    volumes:
+      - lexora-data:/app/data
+volumes:
+  lexora-data:
