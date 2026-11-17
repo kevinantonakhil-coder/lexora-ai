@@ -63,7 +63,10 @@ npm run ml:smoke
 
 ## Deployment guidance
 
-- Host backend services in a proper backend runtime, not GitHub Pages.
+- GitHub Pages deploys the static frontend from `public/` using `.github/workflows/pages.yml`. In the repository settings, choose **Pages → Build and deployment → GitHub Actions**.
+- GitHub Pages does not run the Node.js backend. Host the backend separately on a Node.js-capable service with persistent storage; provision `GEMINI_API_KEY` and `GEMINI_MODEL` only in that backend's secret manager.
+- After hosting the backend, set `window.LEXORA_API_BASE_URL` in `public/api-config.js` to its HTTPS origin and set backend `LEXORA_ALLOWED_ORIGIN` to the exact Pages origin (for this repository: `https://kevinantonakhil-coder.github.io`). These are public endpoint/origin values, not secrets.
+- Cross-site authentication depends on browser cookie privacy settings. The backend uses `SameSite=None; Secure` only when an explicit allowed origin is configured; some browsers may block third-party cookies. A custom domain/reverse proxy that keeps frontend and API same-site is preferable for a production deployment.
 - Keep `GEMINI_API_KEY` in a real secret manager or server environment.
 - Ensure the deployment environment can reach Google Generative Language APIs.
 - Keep the database and uploaded content secured with production-grade storage and access controls.

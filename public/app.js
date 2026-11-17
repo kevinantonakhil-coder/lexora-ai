@@ -2,6 +2,9 @@
 
 const app = document.getElementById('app');
 const state = { user: null, csrf: null, cases: [], selectedCase: null, view: 'overview', error: null, loading: false, aiConfig: null, aiTest: null, aiUsage: [], aiStatus: null, legalSources: [], auditLog: null };
+const configuredApiBaseUrl = typeof window.LEXORA_API_BASE_URL === 'string'
+  ? window.LEXORA_API_BASE_URL.trim().replace(/\/+$/, '')
+  : '';
 const jurisdictions = [
   ['UNKNOWN', 'Not specified'], ['UAE_FEDERAL', 'UAE federal'], ['DUBAI_LOCAL', 'Dubai local'],
   ['ABU_DHABI_LOCAL', 'Abu Dhabi local'], ['SHARJAH_LOCAL', 'Sharjah local'], ['AJMAN_LOCAL', 'Ajman local'],
@@ -38,9 +41,14 @@ async function api(url, options = {}) {
   if (state.csrf && options.method && options.method !== 'GET') headers['X-CSRF-Token'] = state.csrf;
   let response;
   try {
-    response = await fetch(url, { credentials: 'same-origin', ...options, headers });
+    const requestUrl = configuredApiBaseUrl ? new URL(url, `${configuredApiBaseUrl}/`).toString() : url;
+    response = await fetch(requestUrl, {
+      credentials: configuredApiBaseUrl ? 'include' : 'same-origin',
+      ...options,
+      headers
+    });
   } catch {
-    throw new Error('LEXORA could not reach its local service. Check that the server is running.');
+    throw new Error('LEXORA could not reach its backend. Check the backend URL and that the service is running.');
   }
   const payload = await response.json().catch(() => ({}));
   if (response.status === 401 && state.user) {
@@ -123,6 +131,30 @@ function renderAuth() {
       button.disabled = false;
     }
   });
+}
+
+function renderPagesBackendSetup() {
+  app.innerHTML = `
+    <main class="auth-shell">
+      <section class="auth-brand">
+        <div class="brand-lockup"><span class="brand-mark">L</span><span>LEXORA</span></div>
+        <div>
+          <p class="eyebrow">LEGAL INTELLIGENCE WORKSPACE</p>
+          <h1>Research with clarity.<br><em>Reason with evidence.</em></h1>
+          <p class="auth-copy">The GitHub Pages frontend is online. The private API backend has not been connected yet.</p>
+        </div>
+        <p class="auth-foot">STATIC FRONTEND · BACKEND REQUIRED</p>
+      </section>
+      <section class="auth-form-wrap">
+        <div class="auth-form">
+          <p class="eyebrow">DEPLOYMENT STATUS</p>
+          <h2>Backend not connected</h2>
+          <p class="muted">GitHub Pages hosts static files only. LEXORA needs a separately hosted Node.js backend for accounts, cases, documents, SQLite, and Gemini requests.</p>
+          <p class="auth-notice">After deploying the backend, set <code>window.LEXORA_API_BASE_URL</code> in <code>public/api-config.js</code> to its HTTPS URL. Keep <code>GEMINI_API_KEY</code> on the backend only—never in GitHub Pages.</p>
+          <p class="auth-notice">Use synthetic, non-sensitive data until the backend has production-grade storage, authentication, and privacy controls.</p>
+        </div>
+      </section>
+    </main>`;
 }
 
 function renderShell(content) {
@@ -851,5 +883,9 @@ async function init() {
   }
 }
 
-renderAuth();
-init();
+if (location.hostname.endsWith('.github.io') && !configuredApiBaseUrl) {
+  renderPagesBackendSetup();
+} else {
+  renderAuth();
+  init();
+}

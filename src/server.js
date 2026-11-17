@@ -95,6 +95,7 @@ const LEGAL_DOCUMENT_TYPES = new Set([
 const AMENDMENT_STATUSES = new Set(['original', 'amended', 'consolidated', 'superseded', 'unknown']);
 const STATIC_FILES = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
+  ['/api-config.js', ['api-config.js', 'text/javascript; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/favicon.svg', ['favicon.svg', 'image/svg+xml']]
@@ -479,12 +480,12 @@ function cookieValue(req, name) {
   return null;
 }
 
-function cookieHeader(token, secure, clear = false) {
+function cookieHeader(token, secure, clear = false, sameSite = 'Strict') {
   const attributes = [
     `lexora_session=${clear ? '' : token}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Strict',
+    `SameSite=${sameSite}`,
     `Max-Age=${clear ? 0 : Math.floor(SESSION_MS / 1000)}`
   ];
   if (secure) attributes.push('Secure');
@@ -763,6 +764,18 @@ function normalizeLegalQuote(value) {
 function createServer(options = {}) {
   const env = options.env || process.env;
   const fetchImpl = options.fetchImpl || fetch;
+  const allowedOrigin = env.LEXORA_ALLOWED_ORIGIN || '';
+  if (allowedOrigin) {
+    let parsedOrigin;
+    try {
+      parsedOrigin = new URL(allowedOrigin);
+    } catch {
+      throw new Error('LEXORA_ALLOWED_ORIGIN must be a valid HTTPS origin.');
+    }
+    if (parsedOrigin.origin !== allowedOrigin || parsedOrigin.protocol !== 'https:') {
+      throw new Error('LEXORA_ALLOWED_ORIGIN must be an HTTPS origin without a path.');
+    }
+  }
   const timeoutCandidate = Number(env.AI_TIMEOUT_MS || 20_000);
   const timeoutMs = Number.isInteger(timeoutCandidate) && timeoutCandidate >= 1000 && timeoutCandidate <= 120_000
     ? timeoutCandidate : 20_000;
@@ -772,7 +785,8 @@ function createServer(options = {}) {
   const mlEngine = options.mlEngine || createSemanticEngine({
     cacheDir: options.mlCacheDir || env.LEXORA_ML_CACHE_DIR || path.join(dataDir, 'model-cache')
   });
-  const secureCookies = options.secureCookies ?? env.NODE_ENV === 'production';
+  const secureCookies = options.secureCookies ?? (env.NODE_ENV === 'production' || Boolean(allowedOrigin));
+  const cookieSameSite = allowedOrigin ? 'None' : 'Strict';
   const allowSignup = options.allowSignup ?? env.LEXORA_ALLOW_SIGNUP !== 'false';
   const bootstrapToken = options.bootstrapToken ?? env.LEXORA_ADMIN_BOOTSTRAP_TOKEN ?? '';
   const attempts = new Map();
@@ -1216,7 +1230,7 @@ function createServer(options = {}) {
       }
       attempts.delete(rateKey);
       return json(res, 201, { user: { id: userId, email, role: assignedRole, createdAt: now }, csrfToken }, {
-        'Set-Cookie': cookieHeader(token, secureCookies)
+        'Set-Cookie': cookieHeader(token, secureCookies, false, cookieSameSite)
       });
     }
 
@@ -1242,7 +1256,7 @@ function createServer(options = {}) {
         .run(digest(token), csrfToken, user.id, new Date(Date.now() + SESSION_MS).toISOString(), now);
       appendAudit(db, user.id, 'auth.login', user.id);
       return json(res, 200, { user: safeUser(user), csrfToken }, {
-        'Set-Cookie': cookieHeader(token, secureCookies)
+        'Set-Cookie': cookieHeader(token, secureCookies, false, cookieSameSite)
       });
     }
 
@@ -1255,7 +1269,7 @@ function createServer(options = {}) {
     if (route[0] === 'auth' && route[1] === 'logout' && method === 'POST' && route.length === 2) {
       db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(session.token_hash);
       appendAudit(db, session.user_id, 'auth.logout', session.user_id);
-      return json(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader('', secureCookies, true) });
+      return json(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader('', secureCookies, true, cookieSameSite) });
     }
 
     if (route[0] === 'ai' && route[1] === 'usage' && method === 'GET' && route.length === 2) {
@@ -2045,6 +2059,21 @@ function createServer(options = {}) {
     headers(res, requestId);
     try {
       const url = new URL(req.url, 'http://localhost');
+      const requestOrigin = req.headers.origin;
+      const corsAllowed = Boolean(allowedOrigin && requestOrigin === allowedOrigin);
+      if (requestOrigin && corsAllowed) {
+        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Vary', 'Origin');
+      }
+      if (req.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
+        if (!corsAllowed) throw new HttpError(403, 'CORS_ORIGIN_REJECTED', 'This browser origin is not allowed.');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
+        res.setHeader('Access-Control-Max-Age', '600');
+        res.writeHead(204);
+        return res.end();
+      }
       if (!url.pathname.startsWith('/api/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'This method is not supported.');
         const entry = STATIC_FILES.get(url.pathname);

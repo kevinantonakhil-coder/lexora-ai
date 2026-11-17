@@ -66,6 +66,40 @@ test('health and public shell report real service availability without false AI 
   const icon = await ctx.request('/favicon.svg');
   assert.equal(icon.response.status, 200);
   assert.match(icon.response.headers.get('content-type'), /image\/svg\+xml/);
+  const config = await ctx.request('/api-config.js');
+  assert.equal(config.response.status, 200);
+  assert.match(config.result, /LEXORA_API_BASE_URL/);
+});
+
+test('GitHub Pages API CORS is restricted to the configured HTTPS origin', async (t) => {
+  const origin = 'https://kevinantonakhil-coder.github.io';
+  const ctx = await setup({ env: { LEXORA_ALLOWED_ORIGIN: origin } });
+  t.after(ctx.cleanup);
+  const address = ctx.app.server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const preflight = await fetch(`${base}/api/v1/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: origin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type,x-csrf-token'
+    }
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
+  assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true');
+  assert.match(preflight.headers.get('access-control-allow-headers'), /X-CSRF-Token/i);
+
+  const rejected = await fetch(`${base}/api/v1/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://untrusted.example',
+      'Access-Control-Request-Method': 'POST'
+    }
+  });
+  assert.equal(rejected.status, 403);
+  assert.equal(rejected.headers.get('access-control-allow-origin'), null);
 });
 
 test('registration validates password and starts a user with a CSRF-protected session', async (t) => {
